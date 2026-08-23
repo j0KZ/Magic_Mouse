@@ -1,0 +1,41 @@
+name: build
+
+# El proyecto se escribe en un entorno Linux sin toolchain de Swift, así que
+# esta es la única compilación real que existe. Si esto pasa a verde, el código
+# al menos compila y se empaqueta; lo que se comporte bien en el hardware es
+# otra pregunta, y esa la responde mmg-probe.
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Entorno
+        run: |
+          sw_vers
+          swift --version
+          xcodebuild -version
+
+      - name: Compilar (debug, con warnings a la vista)
+        run: swift build -v 2>&1 | tail -80
+
+      - name: Compilar y empaquetar (release)
+        run: ./build.sh
+
+      - name: Comprobar el bundle
+        run: |
+          test -x build/MagicMouseGestures.app/Contents/MacOS/MagicMouseGestures
+          test -x build/mmg-probe
+          codesign --verify --verbose build/MagicMouseGestures.app
+          plutil -lint build/MagicMouseGestures.app/Contents/Info.plist
+
+      - name: mmg-probe arranca y no explota
+        # El runner no tiene Magic Mouse, así que --devices debe salir limpio
+        # o quejarse de que no hay dispositivos. Lo que no puede es crashear.
+        run: ./build/mmg-probe --help
