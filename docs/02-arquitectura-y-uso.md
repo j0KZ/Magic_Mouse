@@ -158,11 +158,11 @@ Acciones disponibles: `missionControl`, `appExpose`, `spaceLeft`, `spaceRight`,
 
 ## Lo que sé que no sé
 
-Esto se escribió sin acceso al Mac. Nada de esto está verificado en hardware, y
-son exactamente los puntos que resuelve la fase 0:
+Esto se escribió sin acceso al Mac. **Compila limpio** — CI en un runner de
+macOS con Xcode 26.6 y Swift 6.3.3, apuntando a arm64 — pero compilar no es
+funcionar. Nada del comportamiento está verificado en hardware, y estos son
+exactamente los puntos que resuelve la fase 0:
 
-- **No compilé el proyecto.** No hay toolchain de Swift donde se escribió. Es
-  código escrito con cuidado, no código probado.
 - **La dirección del eje Y** en el Magic Mouse. De ahí `invertY`.
 - **Los offsets de la struct de contacto** (96 bytes) vienen de implementaciones
   públicas conocidas, pero hay que confirmarlos en macOS 26. Por eso `--raw`.

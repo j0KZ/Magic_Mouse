@@ -10,13 +10,19 @@ el trackpad.
 
 ## Estado
 
-Primera implementación, **sin verificar en hardware todavía**. Escrita sin acceso
-al Mac, así que el primer paso es el diagnóstico.
+Primera implementación. **Compila limpio** en CI (macOS, Xcode 26.6, Swift 6.3.3,
+arm64), pero el comportamiento **no está verificado en hardware** todavía: se
+escribió sin acceso a un Mac. El primer paso es el diagnóstico.
 
 ```bash
+git clone https://github.com/j0KZ/Magic_Mouse.git
+cd Magic_Mouse
+git checkout claude/magic-mouse-trackpad-gestures-98dlq8
 ./build.sh
 ./build/mmg-probe          # no inyecta nada; seguro para experimentar
 ```
+
+Requiere Xcode o las Command Line Tools instaladas.
 
 Luego:
 
