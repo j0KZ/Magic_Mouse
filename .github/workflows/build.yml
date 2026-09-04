@@ -2,8 +2,9 @@ name: build
 
 # El proyecto se escribe en un entorno Linux sin toolchain de Swift, así que
 # esta es la única compilación real que existe. Si esto pasa a verde, el código
-# al menos compila y se empaqueta; lo que se comporte bien en el hardware es
-# otra pregunta, y esa la responde mmg-probe.
+# compila, se empaqueta y reconoce los gestos de las grabaciones de Fixtures/
+# igual que el día que se midieron. Lo que se *sienta* bien en la mano sigue
+# siendo otra pregunta, y esa solo la responde tener el mouse delante.
 
 on:
   push:
@@ -24,6 +25,11 @@ jobs:
 
       - name: Compilar (debug, con warnings a la vista)
         run: swift build -v 2>&1 | tail -80
+
+      - name: Tests
+        # Reproducen las grabaciones reales de Fixtures/ contra el reconocedor.
+        # Es lo más cerca del hardware que llega un runner sin Magic Mouse.
+        run: swift test
 
       - name: Compilar y empaquetar (release)
         run: ./build.sh

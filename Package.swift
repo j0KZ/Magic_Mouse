@@ -12,5 +12,6 @@ let package = Package(
         .target(name: "MagicMouseKit"),
         .executableTarget(name: "MagicMouseGestures", dependencies: ["MagicMouseKit"]),
         .executableTarget(name: "mmg-probe", dependencies: ["MagicMouseKit"]),
+        .testTarget(name: "MagicMouseKitTests", dependencies: ["MagicMouseKit"]),
     ]
 )
