@@ -9,8 +9,16 @@ private func mtFrameCallback(
     timestamp: Double,
     frame: Int32
 ) -> Int32 {
-    guard let device, let touchData, numTouches > 0 else { return 0 }
-    let touches = TouchDecoder.decode(touchData, count: numTouches)
+    guard let device else { return 0 }
+    // A frame with no contacts is not noise to be filtered out: it is the only
+    // in-band signal that the hand left the mouse. Forward it as an empty array
+    // so the recognizer can close the stroke.
+    let touches: [Touch]
+    if let touchData, numTouches > 0 {
+        touches = TouchDecoder.decode(touchData, count: numTouches)
+    } else {
+        touches = []
+    }
     Engine.shared.handleFrame(device: device, touches: touches, timestamp: timestamp)
     return 0
 }
@@ -145,15 +153,15 @@ public final class Engine {
 
         guard currentConfig.enabled, let recognizer else {
             // Disabling with the hand still on the mouse would otherwise leave
-            // scroll suppressed forever.
-            suppressor.setHandDown(false)
+            // scroll suppressed for the length of the tail.
+            suppressor.release()
             return
         }
 
         let recognition = recognizer.handle(touches: touches, timestamp: timestamp)
 
         if currentConfig.suppressScroll || currentConfig.freezeCursorDuringGesture {
-            suppressor.setHandDown(recognizer.isEngaged)
+            if recognizer.isEngaged { suppressor.holdSuppression() }
         }
 
         guard let recognition else { return }

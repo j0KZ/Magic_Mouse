@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildStatusItem()
 
         guard ensureAccessibility() else { return }
+        ensureInputMonitoring()
 
         Engine.shared.onGesture = { [weak self] direction, action in
             self?.lastGesture = "\(direction.rawValue) → \(action.rawValue)"
@@ -146,6 +147,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - Permissions
+
+    /// Input Monitoring is the permission everyone forgets, because nothing
+    /// fails loudly without it: MTDeviceStart still succeeds and the device
+    /// still lists, but not a single contact frame is delivered. The app is a
+    /// different TCC identity from the Terminal that ran mmg-probe, so its own
+    /// grant is separate. Ask for it explicitly, or three fingers do nothing.
+    private func ensureInputMonitoring() {
+        if InputMonitoring.status == .granted { return }
+
+        _ = InputMonitoring.request()
+
+        let alert = NSAlert()
+        alert.messageText = "Falta el permiso de Monitorización de entrada"
+        alert.informativeText = """
+        MagicMouseGestures necesita Monitorización de entrada para leer los dedos         del Magic Mouse. Sin él la app arranca pero no recibe ningún contacto, y         los gestos no hacen nada.
+
+        Ajustes del Sistema → Privacidad y seguridad → Monitorización de entrada →         activa MagicMouseGestures, y vuelve a abrir la app.
+        """
+        alert.addButton(withTitle: "Abrir Ajustes")
+        alert.addButton(withTitle: "Seguir igual")
+        NSApp.activate(ignoringOtherApps: true)
+
+        if alert.runModal() == .alertFirstButtonReturn,
+           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+            NSWorkspace.shared.open(url)
+        }
+    }
 
     private func ensureAccessibility() -> Bool {
         if AXIsProcessTrusted() { return true }

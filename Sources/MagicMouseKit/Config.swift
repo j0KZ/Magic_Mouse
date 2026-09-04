@@ -41,15 +41,24 @@ public struct Config: Sendable {
 
     // Recognition
     public var fingers = 3
-    /// Distance the fingers must travel, in normalized surface units (0...1).
-    /// The Magic Mouse surface is short, so this is deliberately smaller than a
-    /// trackpad equivalent would be.
-    public var swipeThreshold: Float = 0.09
+    /// Distance the fingers must travel WITHIN the velocity window, in
+    /// normalized surface units (0...1). Because it is measured over a short
+    /// window and not from first contact, this is a speed gate: it rejects a
+    /// slow drift that eventually covers the same ground. Recordings show
+    /// resting-hand drift reaching ~0.3 per 0.3 s, so a deliberate flick has to
+    /// clear that — hence the higher default than a pure-distance threshold.
+    public var swipeThreshold: Float = 0.24
+    /// The window over which travel is measured, in milliseconds. Shorter makes
+    /// the gate stricter about speed; longer lets a gentler swipe through at the
+    /// cost of letting drift through too.
+    public var swipeWindowMs = 220
     /// How much the dominant axis must beat the other one, so a sloppy diagonal
     /// doesn't fire the wrong direction.
     public var axisDominance: Float = 1.6
-    /// A swipe that takes longer than this is a rest, not a gesture.
-    public var maxGestureDuration: Double = 1.2
+    /// How long a finger may vanish before it counts as lifted. On this sensor
+    /// the outer fingers blink out for a frame or two at the edges of the
+    /// surface; without this the stroke restarts mid-swipe and never fires.
+    public var dropoutGraceMs = 200
     /// Set by `mmg-probe` if the surface reports y growing toward you.
     public var invertY = false
     public var invertX = false
@@ -69,11 +78,18 @@ public struct Config: Sendable {
     public var suppressScrollTailMs = 250
     public var freezeCursorDuringGesture = false
 
+    /// Left and right ship unbound, and that is a hardware fact rather than a
+    /// preference: on a 51.5 mm surface three fingers already span x = 0.17 to
+    /// 0.88, so there is nowhere sideways to go. In the recordings a deliberate
+    /// lateral flick moved 0.024 — less than the 0.056 of incidental sideways
+    /// noise while just using the mouse. No threshold separates those. Binding
+    /// them anyway would promise a gesture that can never fire; see
+    /// `Fixtures/lateral.jsonl`.
     public var bindings: [String: String] = [
         Direction.up.rawValue: Action.missionControl.rawValue,
         Direction.down.rawValue: Action.appExpose.rawValue,
-        Direction.left.rawValue: Action.spaceLeft.rawValue,
-        Direction.right.rawValue: Action.spaceRight.rawValue,
+        Direction.left.rawValue: Action.none.rawValue,
+        Direction.right.rawValue: Action.none.rawValue,
     ]
 
     /// Hard override of the key combo for an action, e.g.
@@ -94,7 +110,7 @@ public struct Config: Sendable {
 
 extension Config: Codable {
     private enum CodingKeys: String, CodingKey {
-        case enabled, fingers, swipeThreshold, axisDominance, maxGestureDuration
+        case enabled, fingers, swipeThreshold, swipeWindowMs, axisDominance, dropoutGraceMs
         case invertY, invertX, deviceSelection, useSystemShortcuts
         case suppressScroll, suppressScrollTailMs, freezeCursorDuringGesture
         case bindings, overrides
@@ -107,8 +123,9 @@ extension Config: Codable {
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? enabled
         fingers = try c.decodeIfPresent(Int.self, forKey: .fingers) ?? fingers
         swipeThreshold = try c.decodeIfPresent(Float.self, forKey: .swipeThreshold) ?? swipeThreshold
+        swipeWindowMs = try c.decodeIfPresent(Int.self, forKey: .swipeWindowMs) ?? swipeWindowMs
         axisDominance = try c.decodeIfPresent(Float.self, forKey: .axisDominance) ?? axisDominance
-        maxGestureDuration = try c.decodeIfPresent(Double.self, forKey: .maxGestureDuration) ?? maxGestureDuration
+        dropoutGraceMs = try c.decodeIfPresent(Int.self, forKey: .dropoutGraceMs) ?? dropoutGraceMs
         invertY = try c.decodeIfPresent(Bool.self, forKey: .invertY) ?? invertY
         invertX = try c.decodeIfPresent(Bool.self, forKey: .invertX) ?? invertX
         if let raw = try c.decodeIfPresent(String.self, forKey: .deviceSelection),
@@ -124,7 +141,9 @@ extension Config: Codable {
 
         fingers = max(1, min(5, fingers))
         swipeThreshold = max(0.01, min(0.9, swipeThreshold))
+        swipeWindowMs = max(60, min(600, swipeWindowMs))
         suppressScrollTailMs = max(0, min(2000, suppressScrollTailMs))
+        dropoutGraceMs = max(0, min(1000, dropoutGraceMs))
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -132,8 +151,9 @@ extension Config: Codable {
         try c.encode(enabled, forKey: .enabled)
         try c.encode(fingers, forKey: .fingers)
         try c.encode(swipeThreshold, forKey: .swipeThreshold)
+        try c.encode(swipeWindowMs, forKey: .swipeWindowMs)
         try c.encode(axisDominance, forKey: .axisDominance)
-        try c.encode(maxGestureDuration, forKey: .maxGestureDuration)
+        try c.encode(dropoutGraceMs, forKey: .dropoutGraceMs)
         try c.encode(invertY, forKey: .invertY)
         try c.encode(invertX, forKey: .invertX)
         try c.encode(deviceSelection.rawValue, forKey: .deviceSelection)

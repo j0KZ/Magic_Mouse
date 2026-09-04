@@ -45,6 +45,27 @@ public enum MultitouchBridge {
         return "MultitouchSupport.framework could not be loaded"
     }
 
+    /// Every private symbol we depend on, and whether this macOS still has it.
+    ///
+    /// Worth its own diagnostic because a missing symbol is invisible at run
+    /// time: registration quietly does nothing and the callback never fires,
+    /// which is indistinguishable from a device that reports no contacts.
+    public static func symbolReport() -> [(name: String, found: Bool)] {
+        let names = [
+            "MTDeviceCreateList",
+            "MTRegisterContactFrameCallback",
+            "MTUnregisterContactFrameCallback",
+            "MTDeviceStart",
+            "MTDeviceStop",
+            "MTDeviceIsBuiltIn",
+            "MTDeviceGetFamilyID",
+            "MTDeviceGetSensorSurfaceDimensions",
+        ]
+        return names.map { name in
+            (name, handle.flatMap { dlsym($0, name) } != nil)
+        }
+    }
+
     // MARK: - Devices
 
     /// Describes one multitouch device, with just enough detail to tell a Magic
@@ -72,11 +93,19 @@ public enum MultitouchBridge {
         }
     }
 
+    /// The device refs handed out below belong to the array `MTDeviceCreateList`
+    /// returns. Let that array go and the refs go with it — and because nothing
+    /// checks, registering a callback on a dead ref does not crash: it just
+    /// never delivers a frame. Callers keep these refs for the life of the
+    /// process, so the array has to live that long too.
+    private static var retainedLists: [CFArray] = []
+
     public static func devices() -> [DeviceInfo] {
         guard let createList = symbol("MTDeviceCreateList", as: FnCreateList.self),
               let listPtr = createList() else { return [] }
 
         let list = Unmanaged<CFArray>.fromOpaque(listPtr).takeRetainedValue()
+        retainedLists.append(list)
         let count = CFArrayGetCount(list)
 
         let isBuiltIn = symbol("MTDeviceIsBuiltIn", as: FnIsBuiltIn.self)
