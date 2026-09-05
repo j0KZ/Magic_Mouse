@@ -169,12 +169,37 @@ public final class ActionEmitter {
         post(combo)
     }
 
+    /// Bits que un teclado Mac de verdad pone en el evento, y que hay que
+    /// reproducir para que el atajo se reconozca.
+    ///
+    /// Esto costó una sesión entera de depuración. Un `CGEvent` con solo
+    /// `.maskControl` **llega** al sistema —un event tap lo ve, con el keycode y
+    /// el modificador correctos— y el WindowServer lo ignora sin decir nada. Al
+    /// capturar un Ctrl+↑ real y compararlo bit a bit apareció la diferencia:
+    ///
+    ///     real       keycode 126  flags 0x00A40101  control+fn+numericPad+nonCoalesced
+    ///     fabricado  keycode 126  flags 0x20040000  control
+    ///
+    /// Las flechas de un teclado Mac viajan siempre con `fn` y `numericPad`
+    /// puestos, y el atajo quedó registrado con ellos. Sin esos bits el evento no
+    /// coincide, y el fallo es mudo: ni error, ni aviso, ni nada en el log.
+    /// `mmg-probe --emit e` lo reproduce y lo verifica solo.
+    private static func deviceFlags(for keyCode: CGKeyCode) -> CGEventFlags {
+        switch keyCode {
+        case KeyCodes.leftArrow, KeyCodes.rightArrow, KeyCodes.upArrow, KeyCodes.downArrow:
+            return [.maskSecondaryFn, .maskNumericPad, .maskNonCoalesced]
+        default:
+            return [.maskNonCoalesced]
+        }
+    }
+
     public func post(_ combo: KeyCombo) {
+        let flags = combo.flags.union(Self.deviceFlags(for: combo.keyCode))
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: combo.keyCode, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: combo.keyCode, keyDown: false)
         else { return }
-        down.flags = combo.flags
-        up.flags = combo.flags
+        down.flags = flags
+        up.flags = flags
         down.post(tap: .cghidEventTap)
         up.post(tap: .cghidEventTap)
     }
