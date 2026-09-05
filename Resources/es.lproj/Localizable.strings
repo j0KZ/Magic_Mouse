@@ -1,0 +1,67 @@
+/* Línea de estado de la barra de menús */
+"status.noDevice" = "Sin Magic Mouse";
+"status.connected" = "Magic Mouse · %d dedos";
+"status.lastGesture" = "Último: %@ → %@";
+"status.paused" = "En pausa";
+
+/* Direcciones */
+"direction.up" = "arriba";
+"direction.down" = "abajo";
+"direction.left" = "izquierda";
+"direction.right" = "derecha";
+
+/* Acciones */
+"action.missionControl" = "Mission Control";
+"action.appExpose" = "App Exposé";
+"action.spaceLeft" = "Escritorio anterior";
+"action.spaceRight" = "Escritorio siguiente";
+"action.showDesktop" = "Mostrar el escritorio";
+"action.launchpad" = "Launchpad";
+"action.none" = "Nada";
+
+/* Elementos del menú */
+"menu.enabled" = "Activado";
+"menu.sensitivity" = "Sensibilidad";
+"menu.gestures" = "Gestos";
+"menu.suppressScroll" = "Tragarse el scroll durante el gesto";
+"menu.freezeCursor" = "Congelar el cursor durante el gesto";
+"menu.language" = "Idioma";
+"menu.diagnostics" = "Diagnóstico";
+"menu.shortcuts" = "Atajos resueltos…";
+"menu.openStatus" = "Mostrar el archivo de estado";
+"menu.openConfig" = "Mostrar config.json";
+"menu.reload" = "Recargar la configuración";
+"menu.quit" = "Salir";
+
+/* Niveles de sensibilidad */
+"sensitivity.veryLight" = "Pluma (0,04)";
+"sensitivity.light" = "Suave (0,05)";
+"sensitivity.normal" = "Normal (0,06)";
+"sensitivity.firm" = "Firme (0,08)";
+"sensitivity.veryFirm" = "Muy firme (0,10)";
+"sensitivity.custom" = "A medida (%.2f)";
+
+/* Idioma */
+"language.auto" = "El del sistema";
+"language.en" = "English";
+"language.es" = "Español";
+
+/* Submenú de gestos */
+"gestures.swipeUp" = "Flick hacia arriba";
+"gestures.swipeDown" = "Flick hacia abajo";
+"gestures.lateralNote" = "De lado no cabe en este mouse";
+
+/* Avisos */
+"alert.shortcuts.title" = "Atajos que se van a disparar";
+"alert.shortcuts.empty" = "Todavía no se han resuelto.";
+"alert.ok" = "OK";
+"alert.permissions.one" = "Falta un permiso";
+"alert.permissions.two" = "Faltan dos permisos";
+"alert.permissions.accessibility" = "· Accesibilidad — para disparar los atajos";
+"alert.permissions.input" = "· Monitorización de entrada — para leer los dedos";
+"alert.permissions.body" = "Ajustes del Sistema → Privacidad y seguridad, activa MagicMouseGestures en cada uno, y vuelve a abrir la app.\n\nSi ya aparece marcada, desmárcala y vuelve a marcarla: al recompilar cambia la identidad del binario y macOS invalida el permiso sin decirlo.";
+"alert.permissions.openAccessibility" = "Abrir Accesibilidad";
+"alert.permissions.openInput" = "Abrir Monitorización de entrada";
+"alert.permissions.later" = "Ahora no";
+"alert.language.title" = "Idioma cambiado";
+"alert.language.body" = "Vuelve a abrir MagicMouseGestures para que el menú cambie de idioma.";

@@ -71,6 +71,9 @@ public struct Config: Sendable {
     public var invertY = false
     public var invertX = false
 
+    /// `"auto"`, `"en"` or `"es"`. Menu language; `auto` follows macOS.
+    public var language = "auto"
+
     // Devices
     public var deviceSelection: DeviceSelection = .auto
 
@@ -119,7 +122,7 @@ public struct Config: Sendable {
 extension Config: Codable {
     private enum CodingKeys: String, CodingKey {
         case enabled, fingers, swipeThreshold, swipeWindowMs, axisDominance, dropoutGraceMs
-        case invertY, invertX, deviceSelection, useSystemShortcuts
+        case invertY, invertX, language, deviceSelection, useSystemShortcuts
         case suppressScroll, suppressScrollTailMs, freezeCursorDuringGesture
         case bindings, overrides
     }
@@ -136,6 +139,7 @@ extension Config: Codable {
         dropoutGraceMs = try c.decodeIfPresent(Int.self, forKey: .dropoutGraceMs) ?? dropoutGraceMs
         invertY = try c.decodeIfPresent(Bool.self, forKey: .invertY) ?? invertY
         invertX = try c.decodeIfPresent(Bool.self, forKey: .invertX) ?? invertX
+        language = try c.decodeIfPresent(String.self, forKey: .language) ?? language
         if let raw = try c.decodeIfPresent(String.self, forKey: .deviceSelection),
            let sel = DeviceSelection(rawValue: raw) {
             deviceSelection = sel
@@ -152,6 +156,7 @@ extension Config: Codable {
         swipeWindowMs = max(60, min(600, swipeWindowMs))
         suppressScrollTailMs = max(0, min(2000, suppressScrollTailMs))
         dropoutGraceMs = max(0, min(1000, dropoutGraceMs))
+        if !["auto", "en", "es"].contains(language) { language = "auto" }
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -164,6 +169,7 @@ extension Config: Codable {
         try c.encode(dropoutGraceMs, forKey: .dropoutGraceMs)
         try c.encode(invertY, forKey: .invertY)
         try c.encode(invertX, forKey: .invertX)
+        try c.encode(language, forKey: .language)
         try c.encode(deviceSelection.rawValue, forKey: .deviceSelection)
         try c.encode(useSystemShortcuts, forKey: .useSystemShortcuts)
         try c.encode(suppressScroll, forKey: .suppressScroll)
