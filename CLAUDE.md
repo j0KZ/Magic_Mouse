@@ -11,13 +11,10 @@ hacia arriba en el mouse abre Mission Control**, igual que en el trackpad.
 | Implementación de la ruta estable | Escrita — `Sources/` |
 | ¿Compila? | Sí. CI en macOS, Xcode 26.6, Swift 6.3.3, arm64 |
 | ¿El reconocedor acierta? | **Sí, medido.** `swift test` reproduce grabaciones reales |
-| ¿Se siente bien en la mano? | **Desconocido.** Nadie ha usado la app instalada |
+| ¿Funciona en el hardware? | **Sí.** Probado el 2026-09-05: el flick abre Mission Control |
 
-La distinción importa. Contra las grabaciones de `Fixtures/`, el reconocedor
-dispara en los 12 flicks deliberados y en ninguno de los tramos de uso normal ni
-de barrido lento. Lo que eso **no** dice: si el flick sale natural sin ensayarlo,
-si el movimiento de volver dispara sin querer, y si la supresión de scroll llega
-a tiempo. Eso solo se sabe instalando la app.
+Queda pulirlo, no hacerlo funcionar. Lo pendiente está al final de
+`docs/02-arquitectura-y-uso.md`, sección «Siguiente».
 
 ## Lo que ya se midió — no lo reabras sin datos nuevos
 
@@ -26,9 +23,14 @@ números y su procedencia están en `docs/02-arquitectura-y-uso.md`, sección «
 que se midió», y las grabaciones en `Fixtures/`.
 
 - **El gesto es un flick, no un barrido.** La compuerta es de velocidad
-  (0,24 por ventana de 220 ms), no de distancia. Un barrido lento recorre lo
-  mismo que un flick y es indistinguible de la mano apoyada; medido en velocidad
-  hay un hueco limpio entre 0,17 (uso normal) y 0,19 (flick más flojo).
+  (0,06 por ventana de 80 ms), no de distancia. Un barrido lento recorre lo mismo
+  que un flick y es indistinguible de la mano apoyada.
+- **Ventana corta, no larga** — va contra la intuición. La deriva de la mano es
+  velocidad casi constante y su recorrido crece con la ventana; el flick es una
+  ráfaga y se satura. A 80 ms la separación es 1,34x; a 220 ms, 1,05x.
+- **Afina contra `flick-natural.jsonl`, no contra `flick.jsonl`.** La segunda son
+  flicks hechos a propósito para medir, mucho más secos que los de alguien usando
+  la app. El ajuste calibrado con ellos reconocía 1 de 10 flicks reales.
 - **`invertY: false`.** Adelante sube y. Medido.
 - **Izquierda y derecha no existen en este dispositivo.** Tres dedos ocupan de
   x=0,17 a x=0,88 de 51,5 mm. Un barrido lateral deliberado movió 0,024, menos
@@ -51,8 +53,16 @@ que se midió», y las grabaciones en `Fixtures/`.
 
 ## Trampas de este hardware que ya costaron caro
 
-Las tres se ven idénticas desde fuera («no pasa nada»), y ninguna da un error:
+Todas se ven idénticas desde fuera («no pasa nada»), y ninguna da un error:
 
+- **Un atajo sintético sin los bits del teclado se descarta en silencio.** Un
+  `CGEvent` con solo `.maskControl` llega al sistema —un event tap lo ve— y el
+  WindowServer lo ignora. Las flechas de un teclado Mac llevan siempre `fn` y
+  `numericPad`. Ver `ActionEmitter.deviceFlags`, y `mmg-probe --sniff` para
+  volver a capturarlo si algún día cambia.
+- **Recompilar invalida los dos permisos** y deja filas duplicadas en la lista,
+  así que activarlas a mano no sirve. `tccutil reset ListenEvent` y
+  `tccutil reset Accessibility` con el bundle ID, y volver a conceder.
 - **El stream multitouch no manda frame de cierre: simplemente para.** Nada
   puede depender de que llegue un aviso de «ya no hay dedos». La supresión de
   scroll es un plazo que cada frame empuja hacia adelante, nunca un flag que
@@ -73,13 +83,16 @@ con macOS 27 Golden Gate saliendo a mediados de septiembre de 2026.
 ## Lo primero que hay que hacer
 
 ```bash
-swift test        # el reconocedor contra las grabaciones reales
-./build.sh
+swift test                       # el reconocedor contra las grabaciones reales
+cat ~/.config/magic-mouse-gestures/estado.txt   # qué cree la app de sí misma
+./build/mmg-probe --emit real    # ¿el atajo hace efecto? se verifica solo
+./build/mmg-probe --live         # ¿el gesto se reconoce? sin tocar la app
 ```
 
-Y después, lo único que queda por responder, que necesita la app instalada y sus
-dos permisos: ¿sale Mission Control cuando quieres, no sale cuando no quieres, y
-el scroll normal sigue sintiéndose igual?
+`estado.txt` es lo primero que hay que mirar cuando «no funciona»: dice los dos
+permisos, cuántos dispositivos hay enganchados, si el tap de scroll subió y cuál
+fue el último gesto. Casi todas las sesiones de depuración de este proyecto se
+habrían acortado leyéndolo.
 
 ## Preguntas abiertas que el usuario no ha contestado
 
