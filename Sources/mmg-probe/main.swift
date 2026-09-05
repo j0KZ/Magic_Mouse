@@ -1,5 +1,6 @@
 import Foundation
 import ApplicationServices
+import AppKit
 import CoreGraphics
 import MagicMouseKit
 
@@ -155,6 +156,43 @@ if let variante = optionValue("--emit") {
         post(53, false, [], tap: .cghidEventTap)
     } else {
         print("  ✗ no se abrió con la variante \(variante)")
+    }
+    exit(0)
+}
+
+// MARK: - Vista previa del icono (diagnóstico)
+//
+// Renderiza el icono de la barra de menús a PNG para poder mirarlo, en vez de
+// compilar la app entera y entrecerrar los ojos en la esquina de la pantalla.
+
+if let carpeta = optionValue("--appicon") {
+    // Un .iconset con los tamaños que pide iconutil.
+    let tamanos: [(Int, Int)] = [(16,1),(16,2),(32,1),(32,2),(128,1),(128,2),(256,1),(256,2),(512,1),(512,2)]
+    let fm = FileManager.default
+    try? fm.createDirectory(atPath: carpeta, withIntermediateDirectories: true)
+    for (punto, escala) in tamanos {
+        let pixeles = punto * escala
+        let imagen = AppIcon.image(size: CGFloat(pixeles))
+        guard let tiff = imagen.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { continue }
+        let sufijo = escala == 1 ? "" : "@2x"
+        try? png.write(to: URL(fileURLWithPath: "\(carpeta)/icon_\(punto)x\(punto)\(sufijo).png"))
+    }
+    print("  \(carpeta) listo")
+    exit(0)
+}
+
+if let ruta = optionValue("--icon") {
+    let escalas: [CGFloat] = [18, 36, 128]
+    for alto in escalas {
+        let imagen = MenuBarIcon.image(height: alto)
+        guard let tiff = imagen.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { continue }
+        let destino = ruta.replacingOccurrences(of: ".png", with: "-\(Int(alto)).png")
+        try? png.write(to: URL(fileURLWithPath: destino))
+        print("  \(destino)")
     }
     exit(0)
 }
