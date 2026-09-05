@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var watchdog: Timer?
     private var lastGesture: (direction: Direction, action: Action)?
     private var lastStartResult: Engine.StartResult?
+    private var flashTimer: Timer?
 
     /// Presets for `swipeThreshold`. 0.06 is what the recordings settled on; the
     /// rest are a slider for hands that flick harder or softer, which on a
@@ -47,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Engine.shared.onGesture = { [weak self] direction, action in
             guard let self else { return }
             self.lastGesture = (direction, action)
+            self.flashIcon()
             if let result = self.lastStartResult {
                 StatusReport.write(config: Engine.shared.currentConfig,
                                    result: result, lastGesture: self.describeLastGesture())
@@ -67,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        flashTimer?.invalidate()
         watchdog?.invalidate()
         Engine.shared.stop()
     }
@@ -83,6 +86,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Rebuilt rather than mutated. The menu is small, it is only assembled when
     /// something changed, and a dozen cached outlets to keep in sync is how
     /// checkmarks end up lying about the state.
+    /// Fill the icon for a moment when a gesture fires.
+    ///
+    /// The only feedback that the flick registered. Without it, "the gesture was
+    /// not recognized" and "it was recognized and the action did nothing" look
+    /// exactly the same from the outside — which is the shape of every bug this
+    /// project has had.
+    private func flashIcon() {
+        flashTimer?.invalidate()
+        statusItem.button?.image = MenuBarIcon.activeImage()
+        flashTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
+            self?.statusItem.button?.image = MenuBarIcon.image()
+        }
+    }
+
     private func rebuildMenu() {
         let config = Engine.shared.currentConfig
         let devices = Engine.shared.attachedDeviceCount

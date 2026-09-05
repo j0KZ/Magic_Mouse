@@ -72,6 +72,11 @@ public final class GestureRecognizer {
     private var config: Config
     private var stroke: Stroke?
 
+    /// The last gesture that fired, kept across strokes because the movement it
+    /// has to filter — the hand coming back — happens in a *later* stroke, after
+    /// the fingers lifted. Per-stroke state cannot see it.
+    private var lastFired: (direction: Direction, at: Double)?
+
     public init(config: Config) {
         self.config = config
     }
@@ -79,6 +84,7 @@ public final class GestureRecognizer {
     public func update(config: Config) {
         self.config = config
         stroke = nil
+        lastFired = nil
         isEngaged = false
     }
 
@@ -157,7 +163,19 @@ public final class GestureRecognizer {
 
         guard let direction = direction(dx: dx, dy: dy) else { return nil }
 
+        // Swallow the return trip: right after a flick one way, a flick the
+        // other way is the hand going back, not a gesture. Only the opposite
+        // direction is locked out — flicking the same way twice in a row is
+        // something people actually do, at around 450 ms apart.
+        if let last = lastFired,
+           last.direction == direction.opposite,
+           timestamp - last.at < Double(config.returnLockoutMs) / 1000 {
+            current.hasFired = true
+            return nil
+        }
+
         current.hasFired = true
+        lastFired = (direction, timestamp)
         return Recognition(direction: direction, fingers: config.fingers)
     }
 

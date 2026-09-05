@@ -14,15 +14,14 @@ final class GestureRecognizerTests: XCTestCase {
     func testFlicksRápidosDisparan() throws {
         let fired = Fixture.replay(try Fixture.frames("flick.jsonl"))
 
-        // Los 14 trazos de 3 dedos de la grabación, sin perder ninguno. Que no
-        // baje: cada uno que se pierda es un gesto que el usuario hizo y la app
-        // se comió.
-        XCTAssertEqual(fired.count, 14, "flicks reconocidos: \(fired.map(\.direction))")
-
+        // Los 10 flicks hacia adelante de la grabación, sin perder ninguno. Que
+        // no baje: cada uno que se pierda es un gesto que el usuario hizo y la
+        // app se comió.
+        //
         // Hacia adelante sube y = Mission Control. Si esto se invierte, invertY
         // está mal y el gesto abre lo contrario de lo que se pidió.
         let ups = fired.filter { $0.direction == .up }
-        XCTAssertEqual(ups.count, 10)
+        XCTAssertEqual(ups.count, 10, "flicks reconocidos: \(fired.map(\.direction))")
         XCTAssertTrue(fired.allSatisfy { $0.direction == .up || $0.direction == .down },
                       "un flick vertical no puede salir como horizontal")
     }
@@ -35,8 +34,65 @@ final class GestureRecognizerTests: XCTestCase {
         // es «no funciona». Es el número que hay que mirar antes de tocar el
         // umbral: la grabación de flicks deliberados no lo habría delatado.
         let fired = Fixture.replay(try Fixture.frames("flick-natural.jsonl"))
-        XCTAssertGreaterThanOrEqual(fired.count, 9,
+        XCTAssertGreaterThanOrEqual(fired.count, 8,
                                     "disparos sobre 10 trazos: \(fired.map(\.direction))")
+
+        // Y todos hacia arriba. El usuario estaba haciendo flicks hacia adelante
+        // y nada más: cualquier `down` aquí es la mano volviendo, y en la app se
+        // ve como un App Exposé detrás de cada Mission Control.
+        XCTAssertTrue(fired.allSatisfy { $0.direction == .up },
+                      "algún gesto de vuelta se coló: \(fired.map(\.direction))")
+    }
+
+    func testLaManoQueVuelveNoDisparaElGestoContrario() throws {
+        // Un flick hacia arriba y, medio segundo después, la mano volviendo. Es
+        // el movimiento que hace cualquiera, y sin esto Mission Control llega
+        // siempre acompañado de un App Exposé.
+        let recognizer = GestureRecognizer(config: Config())
+
+        func flick(desde inicio: Float, hasta fin: Float, empezandoEn t0: Double) -> [Direction] {
+            var fired: [Direction] = []
+            let pasos = 22
+            for step in 0...pasos {
+                let t = t0 + Double(step) * 0.015
+                let y = inicio + (fin - inicio) * Float(step) / Float(pasos)
+                let touches = (0..<3).map { i in
+                    Touch(id: Int32(50 + i), state: .touching,
+                          x: 0.25 + Float(i) * 0.25, y: y, vx: 0, vy: 0, size: 1)
+                }
+                if let r = recognizer.handle(touches: touches, timestamp: t) { fired.append(r.direction) }
+            }
+            // Levantar la mano entre trazos, que es lo que se hace de verdad.
+            _ = recognizer.handle(touches: [], timestamp: t0 + 0.4)
+            return fired
+        }
+
+        XCTAssertEqual(flick(desde: 0.25, hasta: 0.70, empezandoEn: 5000), [.up])
+        XCTAssertEqual(flick(desde: 0.70, hasta: 0.25, empezandoEn: 5000.5), [],
+                       "la mano volviendo medio segundo después disparó")
+
+        // Pero pasado el bloqueo, un flick hacia abajo deliberado sí cuenta.
+        XCTAssertEqual(flick(desde: 0.70, hasta: 0.25, empezandoEn: 5002), [.down])
+    }
+
+    func testDosFlicksSeguidosIgualesCuentanLosDos() throws {
+        // El bloqueo es solo para la dirección contraria: repetir el mismo gesto
+        // es algo que la gente hace, y en las grabaciones sale cada ~450 ms.
+        let recognizer = GestureRecognizer(config: Config())
+        var fired: [Direction] = []
+        for (índice, t0) in [6000.0, 6000.45].enumerated() {
+            for step in 0...22 {
+                let t = t0 + Double(step) * 0.015
+                let y = 0.25 + 0.45 * Float(step) / 22
+                let touches = (0..<3).map { i in
+                    Touch(id: Int32(60 + índice * 3 + i), state: .touching,
+                          x: 0.25 + Float(i) * 0.25, y: y, vx: 0, vy: 0, size: 1)
+                }
+                if let r = recognizer.handle(touches: touches, timestamp: t) { fired.append(r.direction) }
+            }
+            _ = recognizer.handle(touches: [], timestamp: t0 + 0.35)
+        }
+        XCTAssertEqual(fired, [.up, .up])
     }
 
     // MARK: - No debe disparar
