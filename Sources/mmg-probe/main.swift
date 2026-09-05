@@ -184,9 +184,10 @@ if let carpeta = optionValue("--appicon") {
 }
 
 if let ruta = optionValue("--icon") {
-    let escalas: [CGFloat] = [18, 36, 128]
-    for alto in escalas {
-        let imagen = MenuBarIcon.image(height: alto)
+    // El icono de barra ya es un símbolo del sistema, así que aquí solo se
+    // vuelca tal cual para poder mirarlo fuera de la barra de menús.
+    for alto in [18, 36, 128] {
+        let imagen = MenuBarIcon.image()
         guard let tiff = imagen.tiffRepresentation,
               let rep = NSBitmapImageRep(data: tiff),
               let png = rep.representation(using: .png, properties: [:]) else { continue }

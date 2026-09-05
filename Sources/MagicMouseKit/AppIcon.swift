@@ -53,30 +53,24 @@ public enum AppIcon {
         context.strokePath()
         context.restoreGState()
 
-        // The mouse, same two shapes as the menu bar icon so they read as one
-        // family: a 1:2 capsule with three contacts on the touch half.
-        let bodyHeight = plate * 0.50
-        let bodyWidth = bodyHeight / 1.95
-        let line = bodyWidth * 0.11
-        let body = CGRect(x: (size - bodyWidth) / 2,
-                          y: (size - bodyHeight) / 2 - plate * 0.055,
-                          width: bodyWidth, height: bodyHeight)
+        var body = CGRect(x: size * 0.35, y: size * 0.3, width: size * 0.3, height: size * 0.4)
+        let line = plate * 0.03
 
-        context.setStrokeColor(NSColor.white.cgColor)
-        context.setFillColor(NSColor.white.cgColor)
-        context.setLineWidth(line)
-        context.addPath(CGPath(roundedRect: body,
-                               cornerWidth: bodyWidth / 2, cornerHeight: bodyWidth / 2,
-                               transform: nil))
-        context.strokePath()
-
-        let dot = bodyWidth * 0.155
-        let spread = bodyWidth * 0.28
-        let dotsY = body.maxY - body.height * 0.235
-        for offset in [-spread, 0, spread] {
-            context.fillEllipse(in: CGRect(x: body.midX + offset - dot / 2,
-                                           y: dotsY - dot / 2,
-                                           width: dot, height: dot))
+        // The same mouse as the menu bar icon, so the two read as one family.
+        let glyphHeight = plate * 0.46
+        // `paletteColors` en vez de fijar el color y dibujar: un símbolo no es una
+        // plantilla por defecto, así que sale negro sobre el degradado oscuro y
+        // desaparece — que es exactamente lo que pasó al primer intento.
+        let configuration = NSImage.SymbolConfiguration(pointSize: glyphHeight, weight: .regular)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
+        if let glyph = NSImage(systemSymbolName: "computermouse", accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration) {
+            let drawn = glyph.size
+            let box = CGRect(x: (size - drawn.width) / 2,
+                             y: (size - drawn.height) / 2 - plate * 0.06,
+                             width: drawn.width, height: drawn.height)
+            glyph.draw(in: box)
+            body = box
         }
 
         // Two chevrons lifting off the top, fading out: the flick. There is room
@@ -84,9 +78,9 @@ public enum AppIcon {
         // stops at the capsule and the dots.
         context.setLineCap(.round)
         context.setLineJoin(.round)
-        let half = bodyWidth * 0.34
+        let half = body.width * 0.33
         for (index, alpha) in [(0, 0.70), (1, 0.26)] {
-            let base = body.maxY + plate * 0.055 + CGFloat(index) * plate * 0.078
+            let base = body.maxY + plate * 0.062 + CGFloat(index) * plate * 0.068
             let rise = plate * 0.040
             context.setStrokeColor(NSColor(white: 1, alpha: alpha).cgColor)
             context.setLineWidth(line * 0.85)
