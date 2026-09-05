@@ -44,14 +44,22 @@ public struct Config: Sendable {
     /// Distance the fingers must travel WITHIN the velocity window, in
     /// normalized surface units (0...1). Because it is measured over a short
     /// window and not from first contact, this is a speed gate: it rejects a
-    /// slow drift that eventually covers the same ground. Recordings show
-    /// resting-hand drift reaching ~0.3 per 0.3 s, so a deliberate flick has to
-    /// clear that — hence the higher default than a pure-distance threshold.
-    public var swipeThreshold: Float = 0.24
-    /// The window over which travel is measured, in milliseconds. Shorter makes
-    /// the gate stricter about speed; longer lets a gentler swipe through at the
-    /// cost of letting drift through too.
-    public var swipeWindowMs = 220
+    /// slow drift that eventually covers the same ground.
+    public var swipeThreshold: Float = 0.06
+    /// The window over which travel is measured, in milliseconds.
+    ///
+    /// Short — five frames — and that is the counter-intuitive part, arrived at
+    /// by sweeping both knobs against the recordings. A resting hand drifts at a
+    /// roughly steady speed, so its displacement keeps growing with the window;
+    /// a flick is a burst that saturates once the window outlasts it. Widening
+    /// the window therefore helps the drift more than the gesture. At 80 ms the
+    /// gap between the two is widest: the user's natural flicks land at
+    /// 0.07–0.11 while the worst incidental drift reaches 0.058.
+    ///
+    /// Measured, not guessed. 220 ms with a threshold of 0.24 recognized 1 of 10
+    /// natural flicks; 80 ms at 0.06 recognizes 9, with no new false positive on
+    /// any recording. See `Fixtures/flick-natural.jsonl`.
+    public var swipeWindowMs = 80
     /// How much the dominant axis must beat the other one, so a sloppy diagonal
     /// doesn't fire the wrong direction.
     public var axisDominance: Float = 1.6

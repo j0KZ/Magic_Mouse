@@ -14,16 +14,29 @@ final class GestureRecognizerTests: XCTestCase {
     func testFlicksRápidosDisparan() throws {
         let fired = Fixture.replay(try Fixture.frames("flick.jsonl"))
 
-        // 12 flicks deliberados en la grabación. Que no baje: cada uno que se
-        // pierda es un gesto que el usuario hizo y la app se comió.
-        XCTAssertEqual(fired.count, 12, "flicks reconocidos: \(fired.map(\.direction))")
+        // Los 14 trazos de 3 dedos de la grabación, sin perder ninguno. Que no
+        // baje: cada uno que se pierda es un gesto que el usuario hizo y la app
+        // se comió.
+        XCTAssertEqual(fired.count, 14, "flicks reconocidos: \(fired.map(\.direction))")
 
         // Hacia adelante sube y = Mission Control. Si esto se invierte, invertY
         // está mal y el gesto abre lo contrario de lo que se pidió.
         let ups = fired.filter { $0.direction == .up }
-        XCTAssertEqual(ups.count, 8)
+        XCTAssertEqual(ups.count, 10)
         XCTAssertTrue(fired.allSatisfy { $0.direction == .up || $0.direction == .down },
                       "un flick vertical no puede salir como horizontal")
+    }
+
+    func testFlicksNaturalesDisparan() throws {
+        // La grabación que importa. `flick.jsonl` son flicks deliberados, hechos
+        // a propósito para medir; ésta es el usuario intentando usar la app de
+        // verdad, y sale bastante más suave. Con el ajuste anterior
+        // (0,24 / 220 ms) de estos 10 trazos disparaba **uno**, y desde fuera eso
+        // es «no funciona». Es el número que hay que mirar antes de tocar el
+        // umbral: la grabación de flicks deliberados no lo habría delatado.
+        let fired = Fixture.replay(try Fixture.frames("flick-natural.jsonl"))
+        XCTAssertGreaterThanOrEqual(fired.count, 9,
+                                    "disparos sobre 10 trazos: \(fired.map(\.direction))")
     }
 
     // MARK: - No debe disparar
