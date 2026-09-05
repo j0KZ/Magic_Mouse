@@ -11,6 +11,9 @@ import CoreGraphics
 /// on the surface, plus a short tail to absorb the momentum macOS sends after
 /// the fingers lift.
 ///
+/// Suppression is a deadline that every engaged frame pushes forward, never a
+/// flag that something else has to remember to lower — see `holdSuppression()`.
+///
 /// The tap is session-wide — it cannot tell a Magic Mouse scroll from a trackpad
 /// one — but it is only armed during the fraction of a second when three fingers
 /// are down on the mouse, and you are not scrolling with the trackpad at that
@@ -19,9 +22,14 @@ public final class ScrollSuppressor {
 
     private let lock = NSLock()
     private var suppressUntil: CFAbsoluteTime = 0
-    private var handIsDown = false
     private var freezeCursor = false
     private var tailSeconds: Double = 0.25
+
+    /// Floor for how long one frame holds suppression. Frames arrive about every
+    /// 15 ms while the hand is down, so anything above that keeps the hold
+    /// continuous even if a few arrive late — and it keeps a configured tail of
+    /// 0 from meaning "never suppress anything".
+    private static let minimumHold: Double = 0.1
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -32,15 +40,23 @@ public final class ScrollSuppressor {
 
     // MARK: - Called from the multitouch thread
 
-    /// Arm or disarm suppression. Called on every frame, so it must stay cheap.
-    public func setHandDown(_ down: Bool) {
+    /// Hold suppression a little longer. Called on every engaged frame, so it
+    /// must stay cheap.
+    ///
+    /// This pushes a deadline forward instead of latching a flag, and that is not
+    /// a detail: the multitouch stream **stops** when the hand leaves the mouse.
+    /// There is no closing frame to lower a flag on, so a latched flag would stay
+    /// raised and scroll would be dead for the rest of the session.
+    public func holdSuppression() {
         lock.lock()
-        if down {
-            handIsDown = true
-        } else if handIsDown {
-            handIsDown = false
-            suppressUntil = CFAbsoluteTimeGetCurrent() + tailSeconds
-        }
+        suppressUntil = CFAbsoluteTimeGetCurrent() + max(tailSeconds, Self.minimumHold)
+        lock.unlock()
+    }
+
+    /// Let scroll through again right now, without waiting out the tail.
+    public func release() {
+        lock.lock()
+        suppressUntil = 0
         lock.unlock()
     }
 
@@ -55,7 +71,6 @@ public final class ScrollSuppressor {
         lock.lock()
         defer { lock.unlock() }
         if isMovement && !freezeCursor { return false }
-        if handIsDown { return true }
         return CFAbsoluteTimeGetCurrent() < suppressUntil
     }
 

@@ -1,0 +1,67 @@
+/* Menu bar status line */
+"status.noDevice" = "No Magic Mouse";
+"status.connected" = "Magic Mouse · %d fingers";
+"status.lastGesture" = "Last: %@ → %@";
+"status.paused" = "Paused";
+
+/* Directions */
+"direction.up" = "up";
+"direction.down" = "down";
+"direction.left" = "left";
+"direction.right" = "right";
+
+/* Actions */
+"action.missionControl" = "Mission Control";
+"action.appExpose" = "App Exposé";
+"action.spaceLeft" = "Previous space";
+"action.spaceRight" = "Next space";
+"action.showDesktop" = "Show desktop";
+"action.launchpad" = "Launchpad";
+"action.none" = "Nothing";
+
+/* Menu items */
+"menu.enabled" = "Enabled";
+"menu.sensitivity" = "Sensitivity";
+"menu.gestures" = "Gestures";
+"menu.suppressScroll" = "Suppress scroll while gesturing";
+"menu.freezeCursor" = "Freeze cursor while gesturing";
+"menu.language" = "Language";
+"menu.diagnostics" = "Diagnostics";
+"menu.shortcuts" = "Resolved shortcuts…";
+"menu.openStatus" = "Show status file";
+"menu.openConfig" = "Show config.json";
+"menu.reload" = "Reload settings";
+"menu.quit" = "Quit";
+
+/* Sensitivity presets */
+"sensitivity.veryLight" = "Feather (0.04)";
+"sensitivity.light" = "Light (0.05)";
+"sensitivity.normal" = "Normal (0.06)";
+"sensitivity.firm" = "Firm (0.08)";
+"sensitivity.veryFirm" = "Very firm (0.10)";
+"sensitivity.custom" = "Custom (%.2f)";
+
+/* Language options */
+"language.auto" = "System";
+"language.en" = "English";
+"language.es" = "Español";
+
+/* Gesture submenu */
+"gestures.swipeUp" = "Flick up";
+"gestures.swipeDown" = "Flick down";
+"gestures.lateralNote" = "Sideways doesn't fit on this mouse";
+
+/* Alerts */
+"alert.shortcuts.title" = "Shortcuts that will fire";
+"alert.shortcuts.empty" = "Nothing resolved yet.";
+"alert.ok" = "OK";
+"alert.permissions.one" = "One permission is missing";
+"alert.permissions.two" = "Two permissions are missing";
+"alert.permissions.accessibility" = "· Accessibility — to fire the shortcuts";
+"alert.permissions.input" = "· Input Monitoring — to read your fingers";
+"alert.permissions.body" = "System Settings → Privacy & Security, turn MagicMouseGestures on in each one, then reopen the app.\n\nIf it is already ticked, untick it and tick it again: rebuilding changes the binary's identity and macOS quietly drops the grant.";
+"alert.permissions.openAccessibility" = "Open Accessibility";
+"alert.permissions.openInput" = "Open Input Monitoring";
+"alert.permissions.later" = "Not now";
+"alert.language.title" = "Language changed";
+"alert.language.body" = "Reopen MagicMouseGestures for the menu to switch language.";

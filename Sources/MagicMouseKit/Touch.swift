@@ -12,6 +12,16 @@ public struct Touch {
     /// Total capacitance. Useful as a proxy for how hard the finger is pressing.
     public let size: Float
 
+    public init(id: Int32, state: State, x: Float, y: Float, vx: Float, vy: Float, size: Float) {
+        self.id = id
+        self.state = state
+        self.x = x
+        self.y = y
+        self.vx = vx
+        self.vy = vy
+        self.size = size
+    }
+
     public enum State: Int32 {
         case notTouching = 0
         case starting = 1
