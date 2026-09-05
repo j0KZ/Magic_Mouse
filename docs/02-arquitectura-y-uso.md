@@ -69,8 +69,13 @@ Encima de eso, tres reglas que salieron de mirar grabaciones:
   bordes de la superficie el dedo exterior parpadea; exigir los tres en el
   instante del disparo reduce la zona útil al tercio central.
 - **Un disparo por contacto.** Un flick que no se levanta sigue cumpliendo la
-  compuerta frame tras frame, y volver arrastrando es un flick perfecto en la
-  otra dirección.
+  compuerta frame tras frame.
+- **La dirección contraria se bloquea 600 ms tras disparar.** La mano que acaba
+  de hacer el flick tiene que volver, y esa vuelta es un flick perfecto en la
+  otra dirección: sin esto, Mission Control llega siempre con un App Exposé
+  detrás. Lo que lo hace arreglable en vez de un compromiso es que la vuelta es
+  *siempre* la dirección opuesta, así que bloquear solo esa deja intactos los
+  flicks repetidos en el mismo sentido, que la gente hace cada ~450 ms.
 
 **`ScrollSuppressor`** — el problema que identificamos como «el gordo». Con tres
 dedos apoyados, el reconocedor nativo ve dos de ellos y empieza a hacer scroll.
@@ -213,6 +218,7 @@ reiniciar.
 | `swipeWindowMs` | `80` | La ventana. Más corta separa mejor, ver arriba |
 | `axisDominance` | `1.6` | Cuánto debe ganar el eje dominante al otro |
 | `dropoutGraceMs` | `200` | Cuánto puede desaparecer un dedo sin contar como levantado |
+| `returnLockoutMs` | `600` | Tras disparar, cuánto se ignora la dirección **contraria** |
 | `invertY` / `invertX` | `false` | Voltear el eje. Medido, no supuesto |
 | `deviceSelection` | `"auto"` | `auto` (externo + sensor vertical), `external`, `all` |
 | `useSystemShortcuts` | `true` | Leer tus atajos reales en vez de asumir los de fábrica |
@@ -296,10 +302,10 @@ Las grabaciones contestan qué hace el reconocedor. No contestan cómo se siente
 - **Si el flick sale natural o hay que ensayarlo.** El umbral 0,24 sale de un
   hueco limpio en los datos, pero el hueco se midió con el usuario intentando
   hacer flicks a propósito. Con la mano relajada puede quedar corto o pasarse.
-- **Si el flick de vuelta dispara sin querer.** En `flick.jsonl` hay 8 disparos
-  hacia arriba y 4 hacia abajo, y no se sabe cuáles de esos 4 eran deliberados.
-  Si al usar la app aparece un App Exposé detrás de cada Mission Control, la
-  respuesta es dejar `down` sin asignar, o pedir una pausa tras disparar.
+- ~~Si el flick de vuelta dispara sin querer.~~ **Resuelto.** Bloqueando la
+  dirección contraria 600 ms, la grabación de uso real pasa de 8 aciertos más un
+  App Exposé espurio a 8 aciertos limpios, sin perder ninguno de los 10 flicks
+  hacia adelante de la grabación deliberada.
 - **Si la supresión de scroll llega a tiempo.** El *tap* ve el scroll que macOS
   genera al ver dos de los tres dedos; la carrera entre ese scroll y el primer
   frame multitouch no está medida.
@@ -315,16 +321,8 @@ Las grabaciones contestan qué hace el reconocedor. No contestan cómo se siente
 **Funciona.** Probado en el hardware el 2026-09-05: flick de tres dedos hacia
 adelante abre Mission Control.
 
-Lo que queda, por orden de lo que más molesta:
+Lo que queda:
 
-1. **Firmar con una identidad estable en vez de ad-hoc.** Hoy cada recompilación
-   invalida los dos permisos y hay que volver a concederlos. Con un certificado
-   autofirmado en el llavero, el requisito designado deja de depender del hash y
-   la concesión sobrevive.
-2. **Decidir qué hacer con el gesto de vuelta.** La mano que vuelve después de un
-   flick dispara App Exposé de vez en cuando. Se quita dejando `down` sin
-   asignar, o exigiendo una pausa después de disparar. Falta usarlo un rato para
-   saber si molesta de verdad.
-3. **Medir la carrera del supresor de scroll.** El tap se traga el scroll que
+1. **Medir la carrera del supresor de scroll.** El tap se traga el scroll que
    macOS genera al ver dos de los tres dedos, pero nadie ha medido si llega antes
    que el primer evento.

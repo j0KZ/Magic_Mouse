@@ -41,6 +41,15 @@ outlasts it. Widening the window helps the drift more than the gesture.
 | 120 ms | 0.104 | 0.089 | 1.17× |
 | 220 ms | 0.168 | 0.160 | 1.05× |
 
+### The return trip doesn't fire either
+
+The hand that just flicked forward has to come back, and that return is a
+perfectly good flick backwards — so Mission Control would arrive with an App
+Exposé right behind it. What makes this fixable rather than a trade-off: the
+return is always the *opposite* direction. Locking out only that for 600 ms
+leaves repeated flicks the same way working, which people do at roughly 450 ms
+intervals.
+
 ### Install
 
 ```bash
@@ -156,6 +165,15 @@ Ensanchar la ventana ayuda más a la deriva que al gesto.
 | 80 ms | 0,078 | 0,058 | **1,34×** |
 | 120 ms | 0,104 | 0,089 | 1,17× |
 | 220 ms | 0,168 | 0,160 | 1,05× |
+
+### El gesto de vuelta tampoco dispara
+
+La mano que acaba de hacer el flick tiene que volver, y esa vuelta es un flick
+perfecto en la otra dirección: Mission Control llegaría siempre con un App Exposé
+detrás. Lo que lo hace arreglable en vez de un compromiso es que la vuelta es
+*siempre* la dirección opuesta. Bloqueando solo ésa durante 600 ms, los flicks
+repetidos en el mismo sentido siguen funcionando — y la gente los hace cada
+~450 ms.
 
 ### Instalación
 

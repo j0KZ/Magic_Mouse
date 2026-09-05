@@ -2,6 +2,15 @@ import Foundation
 
 public enum Direction: String, CaseIterable, Sendable {
     case up, down, left, right
+
+    public var opposite: Direction {
+        switch self {
+        case .up: return .down
+        case .down: return .up
+        case .left: return .right
+        case .right: return .left
+        }
+    }
 }
 
 public enum Action: String, CaseIterable, Sendable {
@@ -63,6 +72,15 @@ public struct Config: Sendable {
     /// How much the dominant axis must beat the other one, so a sloppy diagonal
     /// doesn't fire the wrong direction.
     public var axisDominance: Float = 1.6
+    /// After a gesture fires, how long the **opposite** direction is ignored.
+    ///
+    /// The hand that just flicked forward has to come back, and that return trip
+    /// is a perfectly good flick backwards — so Mission Control arrives with an
+    /// App Exposé right behind it. What makes this fixable rather than a
+    /// trade-off is that the return is always the *opposite* direction: locking
+    /// out only that leaves repeated flicks the same way working, which people
+    /// do at roughly 450 ms intervals.
+    public var returnLockoutMs = 600
     /// How long a finger may vanish before it counts as lifted. On this sensor
     /// the outer fingers blink out for a frame or two at the edges of the
     /// surface; without this the stroke restarts mid-swipe and never fires.
@@ -121,7 +139,7 @@ public struct Config: Sendable {
 
 extension Config: Codable {
     private enum CodingKeys: String, CodingKey {
-        case enabled, fingers, swipeThreshold, swipeWindowMs, axisDominance, dropoutGraceMs
+        case enabled, fingers, swipeThreshold, swipeWindowMs, axisDominance, dropoutGraceMs, returnLockoutMs
         case invertY, invertX, language, deviceSelection, useSystemShortcuts
         case suppressScroll, suppressScrollTailMs, freezeCursorDuringGesture
         case bindings, overrides
@@ -137,6 +155,7 @@ extension Config: Codable {
         swipeWindowMs = try c.decodeIfPresent(Int.self, forKey: .swipeWindowMs) ?? swipeWindowMs
         axisDominance = try c.decodeIfPresent(Float.self, forKey: .axisDominance) ?? axisDominance
         dropoutGraceMs = try c.decodeIfPresent(Int.self, forKey: .dropoutGraceMs) ?? dropoutGraceMs
+        returnLockoutMs = try c.decodeIfPresent(Int.self, forKey: .returnLockoutMs) ?? returnLockoutMs
         invertY = try c.decodeIfPresent(Bool.self, forKey: .invertY) ?? invertY
         invertX = try c.decodeIfPresent(Bool.self, forKey: .invertX) ?? invertX
         language = try c.decodeIfPresent(String.self, forKey: .language) ?? language
@@ -156,6 +175,7 @@ extension Config: Codable {
         swipeWindowMs = max(60, min(600, swipeWindowMs))
         suppressScrollTailMs = max(0, min(2000, suppressScrollTailMs))
         dropoutGraceMs = max(0, min(1000, dropoutGraceMs))
+        returnLockoutMs = max(0, min(2000, returnLockoutMs))
         if !["auto", "en", "es"].contains(language) { language = "auto" }
     }
 
@@ -167,6 +187,7 @@ extension Config: Codable {
         try c.encode(swipeWindowMs, forKey: .swipeWindowMs)
         try c.encode(axisDominance, forKey: .axisDominance)
         try c.encode(dropoutGraceMs, forKey: .dropoutGraceMs)
+        try c.encode(returnLockoutMs, forKey: .returnLockoutMs)
         try c.encode(invertY, forKey: .invertY)
         try c.encode(invertX, forKey: .invertX)
         try c.encode(language, forKey: .language)
