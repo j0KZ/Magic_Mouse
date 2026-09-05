@@ -63,6 +63,11 @@ Todas se ven idénticas desde fuera («no pasa nada»), y ninguna da un error:
 - **Recompilar invalida los dos permisos** y deja filas duplicadas en la lista,
   así que activarlas a mano no sirve. `tccutil reset ListenEvent` y
   `tccutil reset Accessibility` con el bundle ID, y volver a conceder.
+- **La firma estable hay que autorizarla en el llavero, y eso pide una terminal
+  de verdad.** `codesign` levanta un diálogo por cada proceso nuevo hasta que se
+  autoriza la clave; `security` pide la contraseña por el terminal, así que
+  `scripts/autorizar-firma.sh` se queda mudo si lo lanza un agente o una tarea en
+  segundo plano. Se ejecuta a mano, una vez.
 - **El stream multitouch no manda frame de cierre: simplemente para.** Nada
   puede depender de que llegue un aviso de «ya no hay dedos». La supresión de
   scroll es un plazo que cada frame empuja hacia adelante, nunca un flag que
@@ -101,11 +106,12 @@ Se le preguntaron y las dejó pendientes. No asumas una respuesta:
 - Si tres dedos resulta incómodo, ¿qué alternativa prefiere? (dos dedos +
   modificador, tip-tap, doble toque con dos dedos, o insistir con tres)
 - ¿Congelar también el cursor durante el gesto, o solo matar el scroll?
-- ¿Abrir un Pull Request, o basta la rama?
+  (Está en el menú, por defecto apagado. Falta saber si le sirve.)
 
 ## Convenciones
 
-- Rama de trabajo: `claude/magic-mouse-trackpad-gestures-98dlq8`
+- Rama principal: `claude/magic-mouse-trackpad-gestures-98dlq8`. El trabajo va en
+  ramas aparte y entra por Pull Request (el usuario lo pidió así el 2026-09-05)
 - Documentación y commits en español
 - `swift test` y `swift build` antes de cada commit; el CI de
   `.github/workflows/build.yml` compila y pasa los tests en un runner de macOS y
