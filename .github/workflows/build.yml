@@ -32,12 +32,17 @@ jobs:
         run: swift test
 
       - name: Compilar y empaquetar (release)
-        run: ./build.sh
+        # Ad-hoc explícito: el runner no tiene el certificado de firma, y una
+        # firma ad-hoc a propósito es mejor que una que se decide sola.
+        run: MMG_FIRMA=adhoc ./build.sh
 
       - name: Comprobar el bundle
         run: |
           test -x build/MagicMouseGestures.app/Contents/MacOS/MagicMouseGestures
           test -x build/mmg-probe
+          test -f build/MagicMouseGestures.app/Contents/Resources/AppIcon.icns
+          test -f build/MagicMouseGestures.app/Contents/Resources/en.lproj/Localizable.strings
+          test -f build/MagicMouseGestures.app/Contents/Resources/es.lproj/Localizable.strings
           codesign --verify --verbose build/MagicMouseGestures.app
           plutil -lint build/MagicMouseGestures.app/Contents/Info.plist
 
