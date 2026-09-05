@@ -65,6 +65,24 @@ public final class Engine {
         return attached.count
     }
 
+    /// Whether the scroll tap is up. It fails to start without Accessibility, and
+    /// the permission usually arrives *after* the first launch — so somebody has
+    /// to notice and retry, or the gesture works while the scroll it replaces
+    /// keeps firing underneath it.
+    public var suppressorIsRunning: Bool { suppressor.isRunning }
+
+    /// How many attached devices the current selection *should* have matched.
+    /// The watchdog compares against this rather than the raw device count: on a
+    /// laptop the built-in trackpad is always in the list and never selected, so
+    /// comparing against every device restarts the engine every five seconds
+    /// forever whenever the mouse is away.
+    public var selectableDeviceCount: Int {
+        lock.lock()
+        let selection = config.deviceSelection
+        lock.unlock()
+        return select(from: MultitouchBridge.devices(), using: selection).count
+    }
+
     // MARK: - Lifecycle
 
     @discardableResult

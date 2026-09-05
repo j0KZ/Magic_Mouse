@@ -1,9 +1,13 @@
 import Foundation
+import ApplicationServices
 import CoreGraphics
 import MagicMouseKit
 
-// A read-only diagnostic. It never posts an event, so it is safe to leave
-// running while you experiment with the mouse.
+// A diagnostic. Everything here only listens — devices, contacts, the recognizer,
+// the keyboard sniffer — so it is safe to leave running while you experiment with
+// the mouse. The one exception is `--emit`, which posts a shortcut on purpose, to
+// tell "the gesture wasn't recognized" apart from "the shortcut had no effect".
+// Those are two different failures with identical symptoms.
 
 // Line-buffered on purpose: piped into `tee` or redirected to a file, the
 // default block buffering holds several seconds of frames hostage, and loses
@@ -18,6 +22,7 @@ let hotkeysOnly = args.contains("--hotkeys")
 let wantsCalibrate = args.contains("--calibrate")
 let wantsApply = args.contains("--apply")
 let wantsLive = args.contains("--live")
+let wantsSniff = args.contains("--sniff")
 
 func optionValue(_ name: String) -> String? {
     guard let i = argv.firstIndex(of: name), i + 1 < argv.count else { return nil }
@@ -50,6 +55,8 @@ if args.contains("--help") || args.contains("-h") {
       --threshold N     con --replay, prueba otro swipeThreshold
       --window N        con --replay, prueba otra ventana en ms
       --apply           escribe lo medido en config.json al terminar
+      --sniff           escucha el teclado y vuelca los bits exactos de cada
+                        pulsación — para comparar un atajo real con uno fabricado
       --live            corre el reconocedor real sobre los dedos en vivo y
                         avisa cuándo dispararía — NO inyecta, solo diagnostica
       --help            esto
@@ -59,7 +66,159 @@ if args.contains("--help") || args.contains("-h") {
     exit(0)
 }
 
+// MARK: - Emisión de prueba (diagnóstico)
+//
+// Publica el atajo a mano para separar «el gesto no se reconoce» de «el atajo
+// no hace efecto». Son dos fallos distintos con el mismo síntoma.
+
+/// ¿Está Mission Control en pantalla?
+///
+/// Se nota en la lista de ventanas: el Dock deja de tener sus dos o tres
+/// ventanas de siempre y pasa a tener una por cada ventana de la pantalla, para
+/// dibujar la rejilla. Contarlas evita tener que preguntarle a nadie si vio algo.
+func ventanasDelDock() -> Int {
+    let opciones: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+    guard let lista = CGWindowListCopyWindowInfo(opciones, kCGNullWindowID) as? [[String: Any]]
+    else { return -1 }
+    return lista.filter { ($0[kCGWindowOwnerName as String] as? String) == "Dock" }.count
+}
+
+if let variante = optionValue("--emit") {
+    let trusted = AXIsProcessTrusted()
+    print(trusted ? "✓ Accesibilidad: concedida a este binario"
+                  : "✗ Accesibilidad: FALTA — sin ella los eventos se descartan en silencio")
+    guard trusted else { exit(1) }
+
+    let ctrl: CGKeyCode = 59          // kVK_Control
+    let up: CGKeyCode = 126           // flecha arriba
+    let source = CGEventSource(stateID: .hidSystemState)
+
+    func post(_ key: CGKeyCode, _ down: Bool, _ flags: CGEventFlags, tap: CGEventTapLocation) {
+        guard let e = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down) else { return }
+        e.flags = flags
+        e.post(tap: tap)
+    }
+
+    let antes = ventanasDelDock()
+    print("  ventanas del Dock antes: \(antes)")
+    Thread.sleep(forTimeInterval: 1)
+
+    switch variante {
+    case "a":
+        // Lo que hace hoy ActionEmitter: solo la tecla, con el flag puesto.
+        post(up, true, .maskControl, tap: .cghidEventTap)
+        post(up, false, .maskControl, tap: .cghidEventTap)
+    case "b":
+        // Control como tecla de verdad, alrededor de la flecha.
+        post(ctrl, true, .maskControl, tap: .cghidEventTap)
+        post(up, true, .maskControl, tap: .cghidEventTap)
+        post(up, false, .maskControl, tap: .cghidEventTap)
+        post(ctrl, false, [], tap: .cghidEventTap)
+    case "real":
+        // El camino de verdad: el mismo ActionEmitter que usa la app, con la
+        // misma configuración. Probar una variante a mano solo demuestra que la
+        // técnica sirve; esto demuestra que el código que se instala la usa.
+        let emisor = ActionEmitter()
+        emisor.resolve(config: ConfigStore.load().config)
+        emisor.perform(.missionControl)
+    case "d":
+        // Los bits que lleva de verdad una flecha de teclado Mac: fn y
+        // numericPad además de control. Sin ellos el evento llega pero el
+        // WindowServer no lo reconoce como el atajo registrado.
+        let reales: CGEventFlags = [.maskControl, .maskSecondaryFn, .maskNumericPad, .maskNonCoalesced]
+        post(ctrl, true, [.maskControl, .maskNonCoalesced], tap: .cghidEventTap)
+        post(up, true, reales, tap: .cghidEventTap)
+        post(up, false, reales, tap: .cghidEventTap)
+        post(ctrl, false, .maskNonCoalesced, tap: .cghidEventTap)
+    case "e":
+        // Igual pero sin tocar la tecla control, solo los flags.
+        let reales: CGEventFlags = [.maskControl, .maskSecondaryFn, .maskNumericPad, .maskNonCoalesced]
+        post(up, true, reales, tap: .cghidEventTap)
+        post(up, false, reales, tap: .cghidEventTap)
+    case "c":
+        // Igual que b, pero por el tap de sesión.
+        post(ctrl, true, .maskControl, tap: .cgSessionEventTap)
+        post(up, true, .maskControl, tap: .cgSessionEventTap)
+        post(up, false, .maskControl, tap: .cgSessionEventTap)
+        post(ctrl, false, [], tap: .cgSessionEventTap)
+    default:
+        print("  variantes: a (solo flags), b (control real), c (control real por sesión)")
+        exit(1)
+    }
+    Thread.sleep(forTimeInterval: 1.2)
+    let despues = ventanasDelDock()
+    print("  ventanas del Dock después: \(despues)")
+    if despues > antes + 1 {
+        print("  ✅ Mission Control SE ABRIÓ con la variante \(variante)")
+        // Cerrarlo, para no dejar la pantalla ocupada.
+        post(53, true, [], tap: .cghidEventTap)   // esc
+        post(53, false, [], tap: .cghidEventTap)
+    } else {
+        print("  ✗ no se abrió con la variante \(variante)")
+    }
+    exit(0)
+}
+
+// MARK: - Espía de teclado (diagnóstico)
+//
+// Un atajo fabricado y uno real pueden verse iguales y no serlo: las flechas de
+// un teclado Mac llevan bits que nadie recuerda poner a mano. En vez de
+// adivinar cuáles, se mira el evento de verdad.
+
+if wantsSniff {
+    guard AXIsProcessTrusted() else {
+        print("✗ Accesibilidad: FALTA — sin ella no se puede escuchar el teclado"); exit(1)
+    }
+
+    func describe(_ flags: CGEventFlags) -> String {
+        var parts: [String] = []
+        let known: [(CGEventFlags, String)] = [
+            (.maskControl, "control"), (.maskAlternate, "option"), (.maskShift, "shift"),
+            (.maskCommand, "command"), (.maskSecondaryFn, "fn"), (.maskNumericPad, "numericPad"),
+            (.maskAlphaShift, "capsLock"), (.maskHelp, "help"), (.maskNonCoalesced, "nonCoalesced"),
+        ]
+        for (flag, name) in known where flags.contains(flag) { parts.append(name) }
+        return parts.isEmpty ? "(ninguno)" : parts.joined(separator: "+")
+    }
+
+    func sniffCallback(proxy: CGEventTapProxy, type: CGEventType,
+                       event: CGEvent, userInfo: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            return nil
+        }
+        let code = event.getIntegerValueField(.keyboardEventKeycode)
+        let flags = event.flags
+        let kind = type == .keyDown ? "keyDown " : (type == .keyUp ? "keyUp   " : "flags   ")
+        print(String(format: "  %@ keycode %3d   flags 0x%08X   %@",
+                     kind, code, UInt64(flags.rawValue), describe(flags)))
+        return Unmanaged.passUnretained(event)
+    }
+
+    let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
+              | CGEventMask(1 << CGEventType.keyUp.rawValue)
+              | CGEventMask(1 << CGEventType.flagsChanged.rawValue)
+
+    guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
+                                      options: .listenOnly, eventsOfInterest: mask,
+                                      callback: sniffCallback, userInfo: nil) else {
+        print("✗ No se pudo crear el tap de teclado"); exit(1)
+    }
+    let src = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+    CFRunLoopAddSource(CFRunLoopGetMain(), src, .commonModes)
+    CGEvent.tapEnable(tap: tap, enable: true)
+
+    print("""
+
+    Espía de teclado — solo mira, no modifica nada
+    \(String(repeating: "─", count: 60))
+    Pulsa Ctrl+↑ con el teclado. Aquí saldrán los bits exactos del evento real.
+    """)
+    signal(SIGINT) { _ in print("\n  fin."); exit(0) }
+    CFRunLoopRun()
+}
+
 // MARK: - Replay
+
 //
 // Deliberately ahead of every hardware check: the whole point is to re-run the
 // recognizer over swipes that were already captured, on any machine, with no
@@ -178,14 +337,36 @@ if wantsLive {
     let pick = all.filter { $0.looksLikeMagicMouse }.first ?? all.first { !$0.isBuiltIn }
     guard let device = pick else { print("No hay Magic Mouse."); exit(1) }
 
-    final class Box { static var rec: GestureRecognizer!; static var cfg = Config(); static var lastEngaged=false }
+    final class Box {
+        static var rec: GestureRecognizer!
+        static var cfg = Config()
+        static var lastEngaged = false
+        static var recorder: FrameLog.Recorder?
+    }
     Box.rec = GestureRecognizer(config: cfg); Box.cfg = cfg
+
+    // Grabar mientras se diagnostica en vivo: lo que pase durante la prueba se
+    // puede volver a pasar por el reconocedor con otros umbrales, en vez de
+    // afinar de oído sobre un recuerdo.
+    if let path = optionValue("--record") {
+        do {
+            Box.recorder = try FrameLog.Recorder(path: path)
+            print("  grabando en \(path)")
+        } catch {
+            print("  ⚠️  no se pudo grabar en \(path): \(error.localizedDescription)")
+        }
+    }
+
+    // Sin esto la salida se queda en el búfer cuando no va a una terminal, y un
+    // diagnóstico que no se ve en el momento no sirve de mucho.
+    setvbuf(stdout, nil, _IOLBF, 0)
 
     func liveCallback(device: MultitouchBridge.DeviceRef?, touchData: UnsafeRawPointer?,
                       numTouches: Int32, timestamp: Double, frame: Int32) -> Int32 {
         let touches: [Touch] = (touchData != nil && numTouches > 0)
             ? TouchDecoder.decode(touchData!, count: numTouches) : []
         let down = touches.filter { $0.state.isDown }.count
+        Box.recorder?.write(timestamp: timestamp, touches: touches)
         if let r = Box.rec.handle(touches: touches, timestamp: timestamp) {
             let action = Box.cfg.action(for: r.direction)
             print(String(format: "  🔥 DISPARARÍA  %@ → %@   (%d dedos)", r.direction.rawValue, action.rawValue, r.fingers))
@@ -206,7 +387,12 @@ if wantsLive {
     guard MultitouchBridge.start(device.ref, callback: liveCallback) else {
         print("No se pudo enganchar el dispositivo."); exit(1)
     }
-    signal(SIGINT) { _ in print("\n  fin."); exit(0) }
+    signal(SIGINT) { _ in
+        Box.recorder?.close()
+        if let recorder = Box.recorder { print("\n  \(recorder.frameCount) frames grabados.") }
+        print("  fin.")
+        exit(0)
+    }
     CFRunLoopRun()
 }
 

@@ -9,20 +9,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let enabledItem = NSMenuItem(title: "Activado", action: #selector(toggleEnabled), keyEquivalent: "")
     private var watchdog: Timer?
     private var lastGesture: String?
+    private var lastStartResult: Engine.StartResult?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildStatusItem()
 
-        guard ensureAccessibility() else { return }
-        ensureInputMonitoring()
-
         Engine.shared.onGesture = { [weak self] direction, action in
-            self?.lastGesture = "\(direction.rawValue) → \(action.rawValue)"
-            self?.refreshStatus()
+            guard let self else { return }
+            self.lastGesture = "\(direction.rawValue) → \(action.rawValue)"
+            if let result = self.lastStartResult {
+                StatusReport.write(config: Engine.shared.currentConfig,
+                                   result: result, lastGesture: self.lastGesture)
+            }
+
+            self.refreshStatus()
         }
 
+        // Arrancar ANTES de avisar de nada. Un `runModal` para el run loop, así
+        // que pedir permisos primero dejaba la app viva, con su icono puesto y
+        // sin motor detrás — indistinguible desde fuera de que no funcione. Y
+        // sin `estado.txt`, que es justo el archivo que lo habría explicado.
         startEngine()
         startWatchdog()
+
+        // Ahora sí, sin bloquear: el aviso va después de que haya algo que
+        // contar sobre por qué no funciona.
+        DispatchQueue.main.async { [weak self] in
+            self?.reportMissingPermissions()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -126,80 +140,89 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !problems.isEmpty {
             NSLog("[MagicMouseGestures] %@", problems.joined(separator: " | "))
         }
+        StatusReport.write(config: config, result: result, lastGesture: lastGesture)
+        lastStartResult = result
         refreshStatus()
     }
 
     /// The Magic Mouse disappears from the multitouch device list when it sleeps
     /// or drops off Bluetooth, and does not come back on its own. Re-attach when
     /// the device list stops matching what we're listening to.
+    ///
+    /// It also picks up a permission granted after launch, which is the normal
+    /// case and not the exception: nobody grants Accessibility before first
+    /// running an app. Without this the engine starts once, the scroll tap fails
+    /// for want of a permission that arrives a minute later, and nothing ever
+    /// retries — the gesture fires while the scroll it was meant to replace keeps
+    /// happening underneath. That is exactly how this looked when it was broken.
     private func startWatchdog() {
         watchdog = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             guard let self else { return }
-            let available = MultitouchBridge.devices().count
+            // Against the devices the selection would match, not every device:
+            // the built-in trackpad is always listed and never chosen, so the
+            // raw count would restart the engine forever while the mouse is away.
+            let available = Engine.shared.selectableDeviceCount
             let attached = Engine.shared.attachedDeviceCount
+
             if available > 0 && attached == 0 {
                 self.startEngine()
             } else if available == 0 && attached > 0 {
                 Engine.shared.stop()
                 self.refreshStatus()
+            } else if self.suppressorShouldBeRunningButIsNot() {
+                self.startEngine()
             }
         }
     }
 
-    // MARK: - Permissions
-
-    /// Input Monitoring is the permission everyone forgets, because nothing
-    /// fails loudly without it: MTDeviceStart still succeeds and the device
-    /// still lists, but not a single contact frame is delivered. The app is a
-    /// different TCC identity from the Terminal that ran mmg-probe, so its own
-    /// grant is separate. Ask for it explicitly, or three fingers do nothing.
-    private func ensureInputMonitoring() {
-        if InputMonitoring.status == .granted { return }
-
-        _ = InputMonitoring.request()
-
-        let alert = NSAlert()
-        alert.messageText = "Falta el permiso de Monitorización de entrada"
-        alert.informativeText = """
-        MagicMouseGestures necesita Monitorización de entrada para leer los dedos         del Magic Mouse. Sin él la app arranca pero no recibe ningún contacto, y         los gestos no hacen nada.
-
-        Ajustes del Sistema → Privacidad y seguridad → Monitorización de entrada →         activa MagicMouseGestures, y vuelve a abrir la app.
-        """
-        alert.addButton(withTitle: "Abrir Ajustes")
-        alert.addButton(withTitle: "Seguir igual")
-        NSApp.activate(ignoringOtherApps: true)
-
-        if alert.runModal() == .alertFirstButtonReturn,
-           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-            NSWorkspace.shared.open(url)
-        }
+    /// Only retry once the permission is actually there, so a Mac where it was
+    /// refused doesn't restart the engine every five seconds for ever.
+    private func suppressorShouldBeRunningButIsNot() -> Bool {
+        let config = Engine.shared.currentConfig
+        guard config.suppressScroll || config.freezeCursorDuringGesture else { return false }
+        return AXIsProcessTrusted() && !Engine.shared.suppressorIsRunning
     }
 
-    private func ensureAccessibility() -> Bool {
-        if AXIsProcessTrusted() { return true }
+    // MARK: - Permissions
 
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
+    /// Un solo aviso, después de arrancar, y solo si de verdad falta algo.
+    private func reportMissingPermissions() {
+        let accessibility = AXIsProcessTrusted()
+        let input = InputMonitoring.status == .granted
+        if accessibility && input { return }
+
+        if !accessibility {
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            _ = AXIsProcessTrustedWithOptions(options)
+        }
+        if !input { _ = InputMonitoring.request() }
+
+        var faltan: [String] = []
+        if !accessibility { faltan.append("· Accesibilidad — para disparar los atajos") }
+        if !input { faltan.append("· Monitorización de entrada — para leer los dedos") }
+
+        let explicacion = """
+
+        Ajustes del Sistema → Privacidad y seguridad, activa MagicMouseGestures \
+        en cada uno, y vuelve a abrir la app.
+
+        Si ya aparece marcada, desmárcala y vuelve a marcarla: al recompilar \
+        cambia la identidad del binario y macOS invalida el permiso sin decirlo.
+        """
 
         let alert = NSAlert()
-        alert.messageText = "Falta el permiso de Accesibilidad"
-        alert.informativeText = """
-        MagicMouseGestures necesita Accesibilidad para leer los gestos y disparar \
-        los atajos del sistema.
-
-        Ajustes del Sistema → Privacidad y seguridad → Accesibilidad → activa \
-        MagicMouseGestures, y vuelve a abrir la app.
-        """
-        alert.addButton(withTitle: "Abrir Ajustes")
-        alert.addButton(withTitle: "Salir")
+        alert.messageText = faltan.count == 1 ? "Falta un permiso" : "Faltan dos permisos"
+        alert.informativeText = faltan.joined(separator: "\n") + "\n" + explicacion
+        alert.addButton(withTitle: !accessibility ? "Abrir Accesibilidad" : "Abrir Monitorización")
+        alert.addButton(withTitle: "Ahora no")
         NSApp.activate(ignoringOtherApps: true)
 
-        if alert.runModal() == .alertFirstButtonReturn,
-           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
+        if alert.runModal() == .alertFirstButtonReturn {
+            let panel = !accessibility ? "Privacy_Accessibility" : "Privacy_ListenEvent"
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?" + panel) {
+                NSWorkspace.shared.open(url)
+            }
         }
-        NSApp.terminate(nil)
-        return false
     }
 }
 
