@@ -110,7 +110,8 @@ Se le preguntaron y las dejó pendientes. No asumas una respuesta:
 
 ## Convenciones
 
-- Rama principal: `claude/magic-mouse-trackpad-gestures-98dlq8`. El trabajo va en
+- Rama principal: `main` (se renombró el 2026-09-17; antes era
+  `claude/magic-mouse-trackpad-gestures-98dlq8`). El trabajo va en
   ramas aparte y entra por Pull Request (el usuario lo pidió así el 2026-09-05)
 - Documentación y commits en español
 - `swift test` y `swift build` antes de cada commit; el CI de
