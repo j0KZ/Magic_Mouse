@@ -67,14 +67,14 @@ public final class ScrollSuppressor {
         lock.unlock()
     }
 
-    fileprivate func shouldSuppress(isMovement: Bool) -> Bool {
+    func shouldSuppress(isMovement: Bool) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         if isMovement && !freezeCursor { return false }
         return CFAbsoluteTimeGetCurrent() < suppressUntil
     }
 
-    fileprivate func wantsMovementEvents() -> Bool {
+    func wantsMovementEvents() -> Bool {
         lock.lock()
         defer { lock.unlock() }
         return freezeCursor

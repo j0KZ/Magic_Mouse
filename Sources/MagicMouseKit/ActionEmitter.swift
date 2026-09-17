@@ -184,7 +184,7 @@ public final class ActionEmitter {
     /// puestos, y el atajo quedó registrado con ellos. Sin esos bits el evento no
     /// coincide, y el fallo es mudo: ni error, ni aviso, ni nada en el log.
     /// `mmg-probe --emit e` lo reproduce y lo verifica solo.
-    private static func deviceFlags(for keyCode: CGKeyCode) -> CGEventFlags {
+    static func deviceFlags(for keyCode: CGKeyCode) -> CGEventFlags {
         switch keyCode {
         case KeyCodes.leftArrow, KeyCodes.rightArrow, KeyCodes.upArrow, KeyCodes.downArrow:
             return [.maskSecondaryFn, .maskNumericPad, .maskNonCoalesced]

@@ -176,6 +176,9 @@ extension Config: Codable {
         suppressScrollTailMs = max(0, min(2000, suppressScrollTailMs))
         dropoutGraceMs = max(0, min(1000, dropoutGraceMs))
         returnLockoutMs = max(0, min(2000, returnLockoutMs))
+        // Sin tope, un 0 o un negativo dejaban pasar cualquier diagonal y un NaN
+        // dejaba de disparar del todo. Los dos fallos son mudos.
+        axisDominance = axisDominance.isFinite ? max(1, min(4, axisDominance)) : Config().axisDominance
         if !["auto", "en", "es"].contains(language) { language = "auto" }
     }
 
